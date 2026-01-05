@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Expense Tracker & Reminders</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        :root { --primary-color: #0d6efd; --warning-color: #ffc107; }
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-header { font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .table-container { max-height: 450px; overflow-y: auto; border-radius: 8px; }
+        .total-display { font-size: 1.4rem; font-weight: 700; color: var(--primary-color); }
+        .badge-pending { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .badge-sent { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .table thead { position: sticky; top: 0; z-index: 10; }
+    </style>
+</head>
+<body>
+
+    <div class="container mt-5">
+        <h2 class="text-center mb-4 text-dark">💰 Expense Tracker & Bill Reminders</h2>
+        
+        <div class="row g-4">
+            <div class="col-lg-12">
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-header bg-primary text-white">Add New Expense</div>
+                    <div class="card-body">
+                        <form id="expense-form" class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" id="title" class="form-control" placeholder="e.g. Groceries" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Amount</label>
+                                <input type="number" step="0.01" id="amount" class="form-control" placeholder="0.00" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Category</label>
+                                <select id="category" class="form-select">
+                                    <option value="Food">Food</option>
+                                    <option value="Transport">Transport</option>
+                                    <option value="Bills">Bills</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Expense Month</label>
+                                <input type="month" id="expense_date" class="form-control" required>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100 fw-bold">Add Expense</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 border-start border-warning border-4">
+                    <div class="card-header bg-white text-dark">🔔 Set Bill Reminder (Email Notification)</div>
+                    <div class="card-body">
+                        <form id="reminder-form" class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" id="bill_name" class="form-control" placeholder="Bill Name" required>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="text" id="due_date" class="form-control" placeholder="Select Date & Time" required>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="email" id="user_email" class="form-control" placeholder="Your Email Address" required>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-dark w-100">Set Reminder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8 mt-5">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="m-0">Recent Expenses</h4>
+                    <div class="d-flex align-items-center bg-white p-2 rounded shadow-sm">
+                        <label class="me-2 fw-bold small text-muted text-uppercase">Filter View:</label>
+                        <input type="month" id="filter_month" class="form-control form-control-sm w-auto" onchange="filterExpensesByMonth()">
+                        <button class="btn btn-outline-secondary btn-sm ms-2" onclick="resetFilters()">Clear</button>
+                    </div>
+                </div>
+
+                <div class="table-container shadow-sm bg-white">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Title</th>
+                                <th>Amount</th>
+                                <th>Category</th>
+                                <th>Month</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expense-list"></tbody>
+                    </table>
+                </div>
+                <div class="p-3 bg-white border-top text-end rounded-bottom shadow-sm">
+                    <span class="total-display">Total Spent: <span id="total-amount">Rs 0.00</span></span>
+                </div>
+            </div>
+
+            <div class="col-lg-4 mt-5">
+                <h4 class="mb-3">Active Reminders</h4>
+                <div class="table-container shadow-sm bg-white">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Bill</th>
+                                <th>Due</th>
+                                <th>Status</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reminder-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        // 1. Initialize Flatpickr for Reminders
+        flatpickr("#due_date", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            minDate: "today"
+        });
+
+        // --- EXPENSE LOGIC ---
+
+        async function fetchExpenses(url = '/api/expenses') {
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                let total = 0;
+                const list = document.getElementById('expense-list');
+                
+                list.innerHTML = data.map(exp => {
+                    total += parseFloat(exp.amount);
+                    const dateObj = new Date(exp.expense_date);
+                    const formattedMonth = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+                    return `
+                        <tr>
+                            <td class="fw-semibold">${exp.title}</td>
+                            <td class="text-primary fw-bold">Rs${parseFloat(exp.amount).toFixed(2)}</td>
+                            <td><span class="badge bg-light text-dark border">${exp.category}</span></td>
+                            <td class="text-muted small">${formattedMonth}</td>
+                            <td class="text-center">
+                                <button class="btn btn-link text-danger p-0" onclick="deleteExpense(${exp.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                document.getElementById('total-amount').innerText = `Rs ${total.toFixed(2)}`;
+            } catch (err) {
+                console.error("Error fetching expenses:", err);
+            }
+        }
+
+        document.getElementById('expense-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const expense = {
+                title: document.getElementById('title').value,
+                amount: document.getElementById('amount').value,
+                category: document.getElementById('category').value,
+                expense_date: document.getElementById('expense_date').value + "-01"
+            };
+
+            await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(expense)
+            });
+
+            document.getElementById('expense-form').reset();
+            fetchExpenses();
+        });
+
+        async function deleteExpense(id) {
+            if(confirm("Delete this expense record?")) {
+                await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+                fetchExpenses();
+            }
+        }
+
+        function filterExpensesByMonth() {
+            const month = document.getElementById('filter_month').value;
+            if(month) fetchExpenses(`/api/expenses/filter/${month}`);
+        }
+
+        function resetFilters() {
+            document.getElementById('filter_month').value = "";
+            fetchExpenses();
+        }
+
+        // --- REMINDER LOGIC ---
+
+        async function fetchReminders() {
+            try {
+                const res = await fetch('/api/reminders');
+                const data = await res.json();
+                document.getElementById('reminder-list').innerHTML = data.map(rem => `
+                    <tr>
+                        <td class="fw-bold">${rem.bill_name}</td>
+                        <td><small class="text-muted">${new Date(rem.due_date).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</small></td>
+                        <td>
+                            <span class="badge ${rem.is_sent ? 'badge-sent' : 'badge-pending'}">
+                                ${rem.is_sent ? 'Sent' : 'Waiting'}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-link text-danger p-0" onclick="deleteReminder(${rem.id})">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error("Error fetching reminders:", err);
+            }
+        }
+
+        document.getElementById('reminder-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const reminder = {
+                bill_name: document.getElementById('bill_name').value,
+                due_date: document.getElementById('due_date').value,
+                user_email: document.getElementById('user_email').value
+            };
+
+            const res = await fetch('/api/reminders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reminder)
+            });
+
+            if(res.ok) {
+                alert("Success: Reminder scheduled!");
+                document.getElementById('reminder-form').reset();
+                fetchReminders();
+            }
+        });
+
+        async function deleteReminder(id) {
+            if(confirm("Remove this bill reminder?")) {
+                try {
+                    const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
+                    if (res.ok) fetchReminders();
+                } catch (err) {
+                    console.error("Error deleting reminder:", err);
+                }
+            }
+        }
+
+        // Initialize Page
+        window.onload = () => {
+            fetchExpenses();
+            fetchReminders();
+        };
+    </script>
+</body>
+</html>
